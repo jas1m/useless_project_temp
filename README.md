@@ -2,43 +2,36 @@
 
 
 
-# [Project Name] 🎯
+# [R-CAPTCHA] 🎯
 
 
 ## Basic Details
-### Team Name: [Name]
+### Team Name: [Figment]
 
 
 ### Team Members
-- Team Lead: [Name] - [College]
-- Member 2: [Name] - [College]
-- Member 3: [Name] - [College]
+- Team Lead: [Jasim Navas] - [Ilahia college of engineering and technology]
+- Member 2: [Amrita Prabha R] - [Ilahia college of engineering and technology]
+
 
 ### Project Description
-[2-3 lines about what your project does]
+[Every CAPTCHA on the internet asks the same tired question: are you human? Reverse CAPTCHA asks the opposite, and enforces it. Access is granted only to users who can demonstrate machine-like precision — pixel-perfect click coordinates, zero typing hesitation, mouse movement in dead-straight lines, form submissions with no corrected typos. Actual humans fail almost immediately, flagged as “suspiciously human” and locked out, while any bot dumb enough to try clears it on the first attempt. The system has never once verified a human successfully, which the team considers not a bug but the entire point.]
 
 ### The Problem (that doesn't exist)
-[What ridiculous problem are you solving?]
+[Why can't bots enter websites?]
 
 ### The Solution (that nobody asked for)
-[How are you solving it? Keep it fun!]
+[Captchas are designed to block humans, not bots. Bots are designed to bypass captchas.]
 
 ## Technical Details
 ### Technologies/Components Used
 For Software:
-- [Languages used]
-- [Frameworks used]
-- [Libraries used]
-- [Tools used]
-
-For Hardware:
-- [List main components]
-- [List specifications]
-- [List tools required]
+- [HTML,CSS]
+- [Antigravity]
 
 ### Implementation
 For Software:
-# Installation
+github pages
 [commands]
 
 # Run
@@ -49,6 +42,7 @@ For Software:
 
 # Screenshots (Add at least 3)
 ![Screenshot1](Add screenshot 1 here with proper name)
+
 *Add caption explaining what this shows*
 
 ![Screenshot2](Add screenshot 2 here with proper name)

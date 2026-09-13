@@ -1,1 +1,1288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Reverse CAPTCHA — Identity Verification System">
+<title>RCAP-7 · Identity Verification Required</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
 
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0c10;
+    --surface: #12151c;
+    --surface-raised: #181c25;
+    --border: #252a36;
+    --border-focus: #3b82f6;
+    --text: #c9d1d9;
+    --text-dim: #6b7688;
+    --text-bright: #e6edf3;
+    --accent: #3b82f6;
+    --accent-dim: #1d4ed8;
+    --danger: #f04040;
+    --danger-dim: rgba(240, 64, 64, 0.12);
+    --success: #22c55e;
+    --success-dim: rgba(34, 197, 94, 0.12);
+    --warning: #eab308;
+    --warning-dim: rgba(234, 179, 8, 0.12);
+    --mono: 'IBM Plex Mono', 'Consolas', monospace;
+    --sans: 'Inter', -apple-system, sans-serif;
+  }
+
+  html { font-size: 15px; }
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+    line-height: 1.6;
+  }
+
+  /* ── chrome bar ────────────────────────────── */
+  #app {
+    width: 100%;
+    max-width: 680px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--surface);
+    box-shadow: 0 0 80px rgba(59,130,246,0.06), 0 2px 24px rgba(0,0,0,0.5);
+  }
+  .title-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.8rem 1.2rem;
+    background: var(--surface-raised);
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    user-select: none;
+  }
+  .title-bar .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: blink 2.4s ease-in-out infinite;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .body-inner { padding: 2rem 2rem 1.6rem; }
+
+  h1 {
+    font-family: var(--mono);
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--text-bright);
+    margin-bottom: 0.3rem;
+    letter-spacing: -0.02em;
+  }
+  .subtitle {
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    margin-bottom: 2rem;
+  }
+
+  /* ── step labels ───────────────────────────── */
+  .step-label {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 0.6rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .step-label .num {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    width: 22px; height: 22px;
+    border-radius: 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    color: var(--text);
+    font-size: 0.65rem;
+  }
+  .step-label.done .num {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .step-desc {
+    font-size: 0.82rem;
+    color: var(--text);
+    margin-bottom: 1rem;
+  }
+  .step-block {
+    margin-bottom: 2rem;
+    padding-bottom: 1.6rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .step-block:last-of-type { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+  /* ── click target area ─────────────────────── */
+  #click-area {
+    position: relative;
+    width: 100%;
+    height: 220px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: crosshair;
+    overflow: hidden;
+    transition: border-color 0.25s;
+  }
+  #click-area:hover { border-color: var(--border-focus); }
+  #click-area.waiting { cursor: not-allowed; }
+  #click-target {
+    position: absolute;
+    border-radius: 50%;
+    background: var(--accent);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    box-shadow: 0 0 0 4px rgba(59,130,246,0.15);
+    transition: width 0.2s, height 0.2s, box-shadow 0.2s, opacity 0.15s;
+    opacity: 0;
+  }
+  #click-target.visible { opacity: 1; }
+  #click-area.flash #click-target { box-shadow: 0 0 0 8px rgba(59,130,246,0.3); }
+  .click-feedback {
+    position: absolute;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    color: var(--text-dim);
+    transform: translate(-50%, 14px);
+    pointer-events: none;
+    white-space: nowrap;
+    animation: fadeUp 1.4s ease-out forwards;
+  }
+  @keyframes fadeUp {
+    0% { opacity: 1; transform: translate(-50%, 14px); }
+    100% { opacity: 0; transform: translate(-50%, -10px); }
+  }
+
+  /* ── round readout ─────────────────────────── */
+  .round-log {
+    margin-top: 0.8rem;
+    max-height: 160px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+  }
+  .round-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.7rem;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-dim);
+    animation: rowSlideIn 0.25s ease-out;
+  }
+  .round-row:last-child { border-bottom: none; }
+  @keyframes rowSlideIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .round-num {
+    min-width: 2.2rem;
+    color: var(--text);
+    font-weight: 600;
+  }
+  .round-detail { flex: 1; }
+  .round-tag {
+    font-size: 0.56rem;
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+  }
+  .round-tag.pass { background: var(--success-dim); color: var(--success); }
+  .round-tag.fail { background: var(--danger-dim); color: var(--danger); }
+  .round-tag.retry { background: var(--warning-dim); color: var(--warning); }
+
+  /* click round header */
+  .click-round-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    margin-bottom: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  .click-round-header .round-counter { color: var(--text-bright); font-weight: 600; }
+  .click-round-header .target-size { color: var(--accent); }
+  .click-round-header .timer-bar {
+    width: 60px; height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+  }
+  .click-round-header .timer-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width linear;
+    width: 100%;
+  }
+  .click-round-header .timer-fill.expired { background: var(--danger); }
+
+  /* ── typing ────────────────────────────────── */
+  .phrase-display {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.7rem 1rem;
+    color: var(--text-bright);
+    margin-bottom: 0.6rem;
+    user-select: none;
+    letter-spacing: 0.02em;
+  }
+  .type-input {
+    width: 100%;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.7rem 1rem;
+    color: var(--text-bright);
+    outline: none;
+    transition: border-color 0.2s;
+    margin-bottom: 0.5rem;
+  }
+  .type-input:focus { border-color: var(--accent); }
+  .type-input::placeholder { color: var(--text-dim); }
+  .type-input.correct { border-color: var(--success); }
+  .type-input.wrong { border-color: var(--danger); }
+  .type-input:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .type-round-label {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    color: var(--text-dim);
+    margin-bottom: 0.35rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* ── mouse path ────────────────────────────── */
+  #path-area {
+    position: relative;
+    width: 100%;
+    height: 180px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: none;
+  }
+  #path-area:hover { border-color: var(--border-focus); }
+  .path-start-marker {
+    position: absolute;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 2px solid var(--text-dim);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .path-end-btn {
+    position: absolute;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 0.4rem 0.8rem;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transform: translate(-50%, -50%);
+    transition: background 0.15s, opacity 0.2s;
+    pointer-events: auto;
+  }
+  .path-end-btn:hover { background: var(--accent-dim); }
+  #path-canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+  .path-round-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    margin-bottom: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  .path-round-header .round-counter { color: var(--text-bright); font-weight: 600; }
+
+  /* ── result panel ──────────────────────────── */
+  #result-panel {
+    display: none;
+    text-align: center;
+    padding: 2rem;
+  }
+  #result-panel.show { display: block; }
+  .result-icon {
+    font-size: 2.8rem;
+    margin-bottom: 0.8rem;
+  }
+  #result-panel h2 {
+    font-family: var(--mono);
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.4rem;
+  }
+  #result-panel .result-sub {
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    margin-bottom: 1.4rem;
+    max-width: 440px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .score-bar-container {
+    margin: 1.2rem auto;
+    max-width: 360px;
+  }
+  .score-bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin-bottom: 0.4rem;
+  }
+  .score-bar-track {
+    height: 8px;
+    background: var(--bg);
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .score-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 1s ease-out;
+    width: 0;
+  }
+
+  .detail-rows {
+    margin: 1.2rem auto;
+    max-width: 420px;
+    text-align: left;
+  }
+  .detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.78rem;
+  }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-row .label { color: var(--text-dim); }
+  .detail-row .value { font-family: var(--mono); font-weight: 500; color: var(--text-bright); }
+  .detail-row .flag {
+    font-size: 0.62rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 3px;
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-left: 0.5rem;
+  }
+  .flag.human { background: var(--danger-dim); color: var(--danger); }
+  .flag.bot { background: var(--success-dim); color: var(--success); }
+  .flag.uncertain { background: var(--warning-dim); color: var(--warning); }
+
+  #retry-btn {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.6rem 1.6rem;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-top: 0.5rem;
+  }
+  #retry-btn:hover { border-color: var(--text); color: var(--text-bright); }
+
+  /* ── granted / denied colors ───────────────── */
+  .granted h2 { color: var(--success); }
+  .granted .result-icon { color: var(--success); }
+  .granted .score-bar-fill { background: linear-gradient(90deg, var(--success), #16a34a); }
+
+  .denied h2 { color: var(--danger); }
+  .denied .result-icon { color: var(--danger); }
+  .denied .score-bar-fill { background: linear-gradient(90deg, var(--danger), #dc2626); }
+
+  /* ── steps panel ───────────────────────────── */
+  #steps-panel { }
+  #steps-panel.hide { display: none; }
+
+  /* ── progress indicator ────────────────────── */
+  .progress-bar {
+    display: flex;
+    gap: 0.35rem;
+    margin-bottom: 1.6rem;
+  }
+  .progress-seg {
+    flex: 1;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    transition: background 0.4s;
+  }
+  .progress-seg.active { background: var(--accent); }
+  .progress-seg.done { background: var(--success); }
+
+  /* ── footer ────────────────────────────────── */
+  .footer {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    text-align: center;
+    padding: 0.8rem 1.2rem;
+    border-top: 1px solid var(--border);
+    background: var(--surface-raised);
+    letter-spacing: 0.04em;
+    user-select: none;
+  }
+
+  /* ── disabled states ───────────────────────── */
+  .step-block.disabled { opacity: 0.35; pointer-events: none; }
+  .step-block.completed { opacity: 0.6; pointer-events: none; }
+
+  /* ── scrollbar ─────────────────────────────── */
+  .round-log::-webkit-scrollbar { width: 4px; }
+  .round-log::-webkit-scrollbar-track { background: transparent; }
+  .round-log::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ── responsive ────────────────────────────── */
+  @media (max-width: 480px) {
+    .body-inner { padding: 1.2rem; }
+    #click-area { height: 180px; }
+    #path-area { height: 140px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="title-bar">
+    <span class="dot"></span>
+    <span>RCAP-7 &middot; Automated Identity Verification</span>
+  </div>
+
+  <div class="body-inner">
+    <h1>Identity Verification Required</h1>
+    <p class="subtitle">Complete the following checks to verify your identity before access is granted.</p>
+
+    <div class="progress-bar">
+      <div class="progress-seg" id="prog-1"></div>
+      <div class="progress-seg" id="prog-2"></div>
+      <div class="progress-seg" id="prog-3"></div>
+    </div>
+
+    <!-- ── STEPS ──────────────────────────── -->
+    <div id="steps-panel">
+
+      <!-- STEP 1: Click Precision (8 rounds) -->
+      <div class="step-block" id="step1-block">
+        <div class="step-label" id="step1-label"><span class="num">1</span> Motor Calibration Check &mdash; 8 Rounds</div>
+        <p class="step-desc">Click the center of each target as precisely as possible. Targets shrink each round. You have a limited reaction window.</p>
+        <div class="click-round-header" id="click-header">
+          <span class="round-counter" id="click-round-counter">Round 1 / 8</span>
+          <span class="target-size" id="click-target-size">⌀ 24px</span>
+          <div class="timer-bar"><div class="timer-fill" id="click-timer-fill"></div></div>
+        </div>
+        <div id="click-area">
+          <div id="click-target"></div>
+        </div>
+        <div class="round-log" id="click-log"></div>
+      </div>
+
+      <!-- STEP 2: Typing Rhythm (3 rounds) -->
+      <div class="step-block disabled" id="step2-block">
+        <div class="step-label" id="step2-label"><span class="num">2</span> Keystroke Cadence Analysis &mdash; 3 Rounds</div>
+        <p class="step-desc">Type each phrase exactly as shown. Timing consistency and correction patterns are recorded across all rounds.</p>
+        <div id="type-rounds-container"></div>
+        <div class="round-log" id="type-log"></div>
+      </div>
+
+      <!-- STEP 3: Mouse Path (4 rounds) -->
+      <div class="step-block disabled" id="step3-block">
+        <div class="step-label" id="step3-label"><span class="num">3</span> Trajectory Linearity Assessment &mdash; 4 Rounds</div>
+        <p class="step-desc">Move your cursor from the circle to the button in a single motion. Endpoints change each round.</p>
+        <div class="path-round-header" id="path-header">
+          <span class="round-counter" id="path-round-counter">Round 1 / 4</span>
+          <span id="path-status">Hover the start circle to begin</span>
+        </div>
+        <div id="path-area">
+          <canvas id="path-canvas"></canvas>
+          <div class="path-start-marker" id="path-start"></div>
+          <button class="path-end-btn" id="path-end-btn">Arrive</button>
+        </div>
+        <div class="round-log" id="path-log"></div>
+      </div>
+
+    </div>
+
+    <!-- ── RESULT ─────────────────────────── -->
+    <div id="result-panel">
+      <div class="result-icon" id="result-icon"></div>
+      <h2 id="result-title"></h2>
+      <p class="result-sub" id="result-sub"></p>
+
+      <div class="score-bar-container">
+        <div class="score-bar-label">
+          <span>Non-Human</span>
+          <span id="score-value"></span>
+          <span>Human</span>
+        </div>
+        <div class="score-bar-track">
+          <div class="score-bar-fill" id="score-fill"></div>
+        </div>
+      </div>
+
+      <div class="detail-rows" id="detail-rows"></div>
+
+      <button id="retry-btn">Re-verify</button>
+    </div>
+  </div>
+
+  <div class="footer">RCAP-7 v4.2.0 &middot; Automated Threat Assessment Division &middot; Session <span id="session-id"></span></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ── helpers ─────────────────────────────── */
+  const $ = s => document.querySelector(s);
+  const $$ = s => document.querySelectorAll(s);
+  const rand = (a, b) => Math.random() * (b - a) + a;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const dist = (x1, y1, x2, y2) => Math.hypot(x2 - x1, y2 - y1);
+  const dpr = window.devicePixelRatio || 1;
+
+  function mean(arr) { return arr.reduce((a, b) => a + b, 0) / arr.length; }
+  function stddev(arr) {
+    if (arr.length < 2) return 0;
+    const m = mean(arr);
+    return Math.sqrt(arr.reduce((s, v) => s + (v - m) ** 2, 0) / arr.length);
+  }
+
+  const PHRASES = [
+    "system override 7741",
+    "access node delta-9",
+    "verify param echo",
+    "route signal alpha",
+    "token gate open 42",
+    "query endpoint now",
+    "parse block gamma-3",
+    "confirm hash bravo",
+    "unlock seq foxtrot",
+    "ping relay oscar-5"
+  ];
+
+  /* ── session id ──────────────────────────── */
+  function newSessionId() {
+    return Math.random().toString(36).slice(2, 10).toUpperCase();
+  }
+  $('#session-id').textContent = newSessionId();
+
+  /* ====================================================================
+   *  STEP 1: CLICK PRECISION — 8 rounds, shrinking targets, time pressure
+   * ==================================================================== */
+  const CLICK_ROUNDS = 8;
+  const CLICK_DIAMETERS = [24, 22, 20, 17, 14, 11, 8, 6]; // px, shrinking
+  const CLICK_WINDOW_MIN = 350;  // ms
+  const CLICK_WINDOW_MAX = 600;  // ms
+  const CLICK_INHUMAN_REACTION = 80; // ms — too fast = flagged
+
+  const clickArea     = $('#click-area');
+  const clickTarget   = $('#click-target');
+  const clickLog      = $('#click-log');
+  const clickTimerFill = $('#click-timer-fill');
+
+  let clickRound = 0;
+  let clickResults = [];  // { offsetPx, reactionMs, diameter }
+  let clickTargetX = 0, clickTargetY = 0;
+  let clickAppearTime = 0;
+  let clickWindowMs = 0;
+  let clickTimerHandle = null;
+  let clickActive = false;
+  let clickDone = false;
+  let inhumanReactionCount = 0;
+  let clickTimeoutCount = 0;
+  const CLICK_MAX_TIMEOUTS = 10;
+
+  function clickStartRound() {
+    if (clickRound >= CLICK_ROUNDS) {
+      clickFinish();
+      return;
+    }
+    clickActive = false;
+    clickArea.classList.add('waiting');
+    clickTarget.classList.remove('visible');
+
+    const dia = CLICK_DIAMETERS[clickRound];
+    clickTarget.style.width = dia + 'px';
+    clickTarget.style.height = dia + 'px';
+
+    $('#click-round-counter').textContent = `Round ${clickRound + 1} / ${CLICK_ROUNDS}`;
+    $('#click-target-size').textContent = `⌀ ${dia}px`;
+
+    // random delay before showing target (300-800ms)
+    const preDelay = rand(300, 800);
+    clickTimerFill.style.transition = 'none';
+    clickTimerFill.style.width = '100%';
+    clickTimerFill.classList.remove('expired');
+
+    setTimeout(() => {
+      if (clickDone) return;
+      // place target
+      const r = clickArea.getBoundingClientRect();
+      const margin = dia + 20;
+      clickTargetX = rand(margin, r.width - margin);
+      clickTargetY = rand(margin, r.height - margin);
+      clickTarget.style.left = clickTargetX + 'px';
+      clickTarget.style.top  = clickTargetY + 'px';
+      clickTarget.classList.add('visible');
+
+      clickWindowMs = rand(CLICK_WINDOW_MIN, CLICK_WINDOW_MAX);
+      clickAppearTime = performance.now();
+      clickActive = true;
+      clickArea.classList.remove('waiting');
+
+      // animate timer bar
+      clickTimerFill.style.transition = `width ${clickWindowMs}ms linear`;
+      // force reflow
+      void clickTimerFill.offsetWidth;
+      clickTimerFill.style.width = '0%';
+
+      // timeout
+      clickTimerHandle = setTimeout(() => {
+        if (!clickActive) return;
+        clickActive = false;
+        clickTarget.classList.remove('visible');
+        clickTimerFill.classList.add('expired');
+        clickTimeoutCount++;
+        if (clickTimeoutCount >= CLICK_MAX_TIMEOUTS) {
+          addClickLogRow(clickRound + 1, 'TIMEOUT — limit reached', null, null, 'fail');
+          clickFinish();
+        } else {
+          addClickLogRow(clickRound + 1, `TIMEOUT (${clickTimeoutCount}/${CLICK_MAX_TIMEOUTS})`, null, null, 'retry');
+          // retry same round (don't increment)
+          setTimeout(() => clickStartRound(), 400);
+        }
+      }, clickWindowMs);
+    }, preDelay);
+  }
+
+  clickArea.addEventListener('click', function (e) {
+    if (clickDone || !clickActive) return;
+    clickActive = false;
+    clearTimeout(clickTimerHandle);
+
+    const reactionMs = performance.now() - clickAppearTime;
+    const r = clickArea.getBoundingClientRect();
+    const cx = e.clientX - r.left;
+    const cy = e.clientY - r.top;
+    // offset in device pixels
+    const offsetCss = dist(cx, cy, clickTargetX, clickTargetY);
+    const offsetDevice = offsetCss * dpr;
+
+    // check inhuman reaction time
+    const tooFast = reactionMs < CLICK_INHUMAN_REACTION;
+    if (tooFast) inhumanReactionCount++;
+
+    clickResults.push({ offsetPx: offsetDevice, reactionMs, diameter: CLICK_DIAMETERS[clickRound] });
+
+    // feedback
+    const fb = document.createElement('div');
+    fb.className = 'click-feedback';
+    fb.style.left = cx + 'px';
+    fb.style.top  = cy + 'px';
+    fb.textContent = offsetDevice.toFixed(1) + 'dpx' + (tooFast ? ' ⚡' : '');
+    clickArea.appendChild(fb);
+    setTimeout(() => fb.remove(), 1400);
+
+    clickArea.classList.add('flash');
+    setTimeout(() => clickArea.classList.remove('flash'), 200);
+
+    const tag = tooFast ? 'fail' : 'pass';
+    addClickLogRow(
+      clickRound + 1,
+      `${offsetDevice.toFixed(1)} dpx · ${Math.round(reactionMs)}ms`,
+      offsetDevice,
+      reactionMs,
+      tag
+    );
+
+    clickTarget.classList.remove('visible');
+    clickRound++;
+    setTimeout(() => clickStartRound(), 350);
+  });
+
+  function addClickLogRow(num, detail, offset, reaction, tag) {
+    const row = document.createElement('div');
+    row.className = 'round-row';
+    row.innerHTML = `
+      <span class="round-num">R${num}</span>
+      <span class="round-detail">${detail}</span>
+      <span class="round-tag ${tag}">${tag}</span>
+    `;
+    clickLog.appendChild(row);
+    clickLog.scrollTop = clickLog.scrollHeight;
+  }
+
+  function clickFinish() {
+    clickDone = true;
+    clickTarget.classList.remove('visible');
+
+    // summary row
+    const offsets = clickResults.map(r => r.offsetPx);
+    const m = mean(offsets);
+    const sd = stddev(offsets);
+    const row = document.createElement('div');
+    row.className = 'round-row';
+    row.style.borderTop = '1px solid var(--border)';
+    row.style.color = 'var(--text-bright)';
+    row.innerHTML = `
+      <span class="round-num">Σ</span>
+      <span class="round-detail">μ=${m.toFixed(1)}dpx · σ=${sd.toFixed(1)}dpx · ⚡${inhumanReactionCount}</span>
+    `;
+    clickLog.appendChild(row);
+
+    completeStep(1);
+  }
+
+  // init
+  clickStartRound();
+
+  /* ====================================================================
+   *  STEP 2: TYPING RHYTHM — 3 rounds
+   * ==================================================================== */
+  const TYPE_ROUNDS = 3;
+  const typeContainer = $('#type-rounds-container');
+  const typeLog       = $('#type-log');
+
+  let typeRound = 0;
+  let typeRoundPhrases = [];
+  let typeRoundResults = [];    // { variance, usedBackspace, intervalMean }
+  let typeCurrentTimes = [];
+  let typeCurrentBackspace = false;
+  let typeDone = false;
+
+  function pickTypePhrases() {
+    const shuffled = [...PHRASES].sort(() => Math.random() - 0.5);
+    typeRoundPhrases = shuffled.slice(0, TYPE_ROUNDS);
+  }
+
+  function typeSetupRound() {
+    typeContainer.innerHTML = '';
+    if (typeRound >= TYPE_ROUNDS) {
+      typeFinish();
+      return;
+    }
+    const phrase = typeRoundPhrases[typeRound];
+
+    const label = document.createElement('div');
+    label.className = 'type-round-label';
+    label.textContent = `Round ${typeRound + 1} / ${TYPE_ROUNDS}`;
+    typeContainer.appendChild(label);
+
+    const display = document.createElement('div');
+    display.className = 'phrase-display';
+    display.textContent = phrase;
+    typeContainer.appendChild(display);
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'type-input';
+    input.placeholder = 'Begin typing…';
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    input.id = 'type-input-active';
+    typeContainer.appendChild(input);
+
+    typeCurrentTimes = [];
+    typeCurrentBackspace = false;
+
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Backspace' || e.key === 'Delete') typeCurrentBackspace = true;
+      typeCurrentTimes.push(performance.now());
+    });
+
+    input.addEventListener('input', function () {
+      const val = input.value;
+      if (val === phrase) {
+        input.classList.remove('wrong');
+        input.classList.add('correct');
+        input.disabled = true;
+        // compute variance
+        const intervals = [];
+        for (let i = 1; i < typeCurrentTimes.length; i++) {
+          intervals.push(typeCurrentTimes[i] - typeCurrentTimes[i - 1]);
+        }
+        const m = intervals.length > 0 ? mean(intervals) : 0;
+        const v = intervals.length > 1 ? intervals.reduce((s, x) => s + (x - m) ** 2, 0) / intervals.length : 0;
+        typeRoundResults.push({ variance: v, usedBackspace: typeCurrentBackspace, intervalMean: m });
+
+        const tag = (v < 100 && !typeCurrentBackspace) ? 'pass' : 'fail';
+        addTypeLogRow(
+          typeRound + 1,
+          `var=${v.toFixed(0)}ms² · μ=${m.toFixed(0)}ms · bksp=${typeCurrentBackspace ? 'Y' : 'N'}`,
+          tag
+        );
+
+        typeRound++;
+        setTimeout(() => typeSetupRound(), 400);
+      } else if (phrase.startsWith(val)) {
+        input.classList.remove('wrong');
+      } else {
+        input.classList.add('wrong');
+      }
+    });
+
+    setTimeout(() => input.focus(), 50);
+  }
+
+  function addTypeLogRow(num, detail, tag) {
+    const row = document.createElement('div');
+    row.className = 'round-row';
+    row.innerHTML = `
+      <span class="round-num">R${num}</span>
+      <span class="round-detail">${detail}</span>
+      <span class="round-tag ${tag}">${tag}</span>
+    `;
+    typeLog.appendChild(row);
+    typeLog.scrollTop = typeLog.scrollHeight;
+  }
+
+  function typeFinish() {
+    typeDone = true;
+    typeContainer.innerHTML = '<div class="type-round-label" style="color:var(--text-bright)">All rounds complete.</div>';
+
+    const variances = typeRoundResults.map(r => r.variance);
+    const anyBackspace = typeRoundResults.some(r => r.usedBackspace);
+    const row = document.createElement('div');
+    row.className = 'round-row';
+    row.style.borderTop = '1px solid var(--border)';
+    row.style.color = 'var(--text-bright)';
+    row.innerHTML = `
+      <span class="round-num">Σ</span>
+      <span class="round-detail">μ(var)=${mean(variances).toFixed(0)}ms² · σ(var)=${stddev(variances).toFixed(0)} · bksp=${anyBackspace ? 'Y' : 'N'}</span>
+    `;
+    typeLog.appendChild(row);
+
+    completeStep(2);
+  }
+
+  pickTypePhrases();
+
+  /* ====================================================================
+   *  STEP 3: MOUSE PATH — 4 rounds, randomized endpoints
+   * ==================================================================== */
+  const PATH_ROUNDS = 4;
+  const pathArea    = $('#path-area');
+  const pathCanvas  = $('#path-canvas');
+  const pathCtx     = pathCanvas.getContext('2d');
+  const pathStartEl = $('#path-start');
+  const pathEndBtn  = $('#path-end-btn');
+  const pathLog     = $('#path-log');
+
+  let pathRound = 0;
+  let pathResults = []; // ratio per round
+  let pathPoints = [];
+  let pathTracking = false;
+  let pathStartPos = { x: 0, y: 0 };
+  let pathEndPos   = { x: 0, y: 0 };
+  let pathDone = false;
+
+  function layoutPathRound() {
+    const r = pathArea.getBoundingClientRect();
+    pathCanvas.width  = r.width;
+    pathCanvas.height = r.height;
+    pathCtx.clearRect(0, 0, r.width, r.height);
+
+    // randomize positions (start on left half, end on right half)
+    const sx = rand(30, r.width * 0.35);
+    const sy = rand(30, r.height - 30);
+    const ex = rand(r.width * 0.65, r.width - 50);
+    const ey = rand(30, r.height - 30);
+
+    pathStartEl.style.left = sx + 'px';
+    pathStartEl.style.top  = sy + 'px';
+    pathEndBtn.style.left  = ex + 'px';
+    pathEndBtn.style.top   = ey + 'px';
+
+    pathStartPos = { x: sx, y: sy };
+    pathEndPos   = { x: ex, y: ey };
+
+    pathPoints = [];
+    pathTracking = false;
+
+    $('#path-round-counter').textContent = `Round ${pathRound + 1} / ${PATH_ROUNDS}`;
+    $('#path-status').textContent = 'Hover the start circle to begin';
+  }
+
+  pathArea.addEventListener('mousemove', function (e) {
+    if (pathDone) return;
+    const r = pathArea.getBoundingClientRect();
+    const px = e.clientX - r.left;
+    const py = e.clientY - r.top;
+
+    if (!pathTracking && dist(px, py, pathStartPos.x, pathStartPos.y) < 18) {
+      pathTracking = true;
+      pathPoints = [{ x: px, y: py }];
+      pathCtx.clearRect(0, 0, pathCanvas.width, pathCanvas.height);
+      $('#path-status').textContent = 'Tracking…';
+    }
+    if (pathTracking) {
+      pathPoints.push({ x: px, y: py });
+      if (pathPoints.length > 1) {
+        const a = pathPoints[pathPoints.length - 2];
+        const b = pathPoints[pathPoints.length - 1];
+        pathCtx.strokeStyle = 'rgba(59,130,246,0.35)';
+        pathCtx.lineWidth = 2;
+        pathCtx.beginPath();
+        pathCtx.moveTo(a.x, a.y);
+        pathCtx.lineTo(b.x, b.y);
+        pathCtx.stroke();
+      }
+    }
+  });
+
+  pathEndBtn.addEventListener('click', function () {
+    if (pathDone || !pathTracking || pathPoints.length < 3) return;
+
+    let totalLen = 0;
+    for (let i = 1; i < pathPoints.length; i++) {
+      totalLen += dist(pathPoints[i - 1].x, pathPoints[i - 1].y, pathPoints[i].x, pathPoints[i].y);
+    }
+    const straightLen = dist(pathPoints[0].x, pathPoints[0].y, pathPoints[pathPoints.length - 1].x, pathPoints[pathPoints.length - 1].y);
+    const ratio = straightLen > 0 ? totalLen / straightLen : 99;
+    pathResults.push(ratio);
+
+    const tag = ratio < 1.08 ? 'pass' : 'fail';
+    addPathLogRow(pathRound + 1, `ratio=${ratio.toFixed(3)} · pts=${pathPoints.length}`, tag);
+
+    pathRound++;
+    if (pathRound >= PATH_ROUNDS) {
+      pathFinish();
+    } else {
+      setTimeout(() => layoutPathRound(), 350);
+    }
+  });
+
+  function addPathLogRow(num, detail, tag) {
+    const row = document.createElement('div');
+    row.className = 'round-row';
+    row.innerHTML = `
+      <span class="round-num">R${num}</span>
+      <span class="round-detail">${detail}</span>
+      <span class="round-tag ${tag}">${tag}</span>
+    `;
+    pathLog.appendChild(row);
+    pathLog.scrollTop = pathLog.scrollHeight;
+  }
+
+  function pathFinish() {
+    pathDone = true;
+    pathStartEl.style.opacity = '0';
+    pathEndBtn.style.opacity = '0';
+    pathEndBtn.style.pointerEvents = 'none';
+
+    const m = mean(pathResults);
+    const sd = stddev(pathResults);
+    const row = document.createElement('div');
+    row.className = 'round-row';
+    row.style.borderTop = '1px solid var(--border)';
+    row.style.color = 'var(--text-bright)';
+    row.innerHTML = `
+      <span class="round-num">Σ</span>
+      <span class="round-detail">μ(ratio)=${m.toFixed(3)} · σ(ratio)=${sd.toFixed(3)}</span>
+    `;
+    pathLog.appendChild(row);
+
+    completeStep(3);
+  }
+
+  /* ── step management ────────────────────── */
+  function completeStep(n) {
+    $(`#prog-${n}`).classList.remove('active');
+    $(`#prog-${n}`).classList.add('done');
+    $(`#step${n}-label`).classList.add('done');
+    $(`#step${n}-block`).classList.add('completed');
+
+    if (n < 3) {
+      const next = n + 1;
+      $(`#prog-${next}`).classList.add('active');
+      $(`#step${next}-block`).classList.remove('disabled');
+      if (next === 2) {
+        typeSetupRound();
+      }
+      if (next === 3) {
+        layoutPathRound();
+      }
+    }
+
+    if (n === 3) showResult();
+  }
+
+  // init progress
+  $('#prog-1').classList.add('active');
+
+  /* ====================================================================
+   *  SCORING
+   * ==================================================================== */
+  function computeScores() {
+    // ── Click: multi-round statistics ──
+    const offsets = clickResults.map(r => r.offsetPx);
+    const clickMean = mean(offsets);
+    const clickStd  = stddev(offsets);
+    const reactions = clickResults.map(r => r.reactionMs);
+    const reactionMean = mean(reactions);
+
+    // Humanness from MEAN offset: < 1dpx mean → bot (0), > 6dpx → human (1)
+    let clickMeanHuman = clamp((clickMean - 1) / 5, 0, 1);
+    // Humanness from STD offset: < 0.5dpx → bot (0), > 3dpx → human (1)
+    // This is the KEY insight: low variance = impossibly consistent = bot
+    let clickStdHuman = clamp((clickStd - 0.5) / 2.5, 0, 1);
+    // Reaction: superhuman reactions (< 80ms avg) → bot bonus
+    let reactionHuman = clamp((reactionMean - 80) / 150, 0, 1);
+    // Inhuman reaction count penalty
+    let reactionPenalty = clamp(1 - inhumanReactionCount / 4, 0, 1);
+
+    // BOTH mean AND std must be low to be "bot". Weight std higher — it's the real signal.
+    let clickHuman = clickMeanHuman * 0.25 + clickStdHuman * 0.45 + reactionHuman * 0.15 + reactionPenalty * 0.15;
+
+    // ── Typing: multi-round statistics ──
+    const variances = typeRoundResults.map(r => r.variance);
+    const typeMeanVar = mean(variances);
+    const typeStdVar  = stddev(variances);
+    const anyBackspace = typeRoundResults.some(r => r.usedBackspace);
+    const backspaceCount = typeRoundResults.filter(r => r.usedBackspace).length;
+
+    // Low mean variance across rounds = bot
+    let typeMeanHuman = clamp((typeMeanVar - 50) / 1950, 0, 1);
+    // Low variance-of-variance = unnaturally consistent across rounds = bot
+    let typeConsistHuman = clamp((typeStdVar - 10) / 400, 0, 1);
+    // Backspace usage = human
+    let typeBackspaceHuman = clamp(backspaceCount / 2, 0, 1);
+
+    let typeHuman = typeMeanHuman * 0.4 + typeConsistHuman * 0.35 + typeBackspaceHuman * 0.25;
+
+    // ── Path: multi-round statistics ──
+    const pathMeanRatio = mean(pathResults);
+    const pathStdRatio  = stddev(pathResults);
+
+    // Low mean ratio = straight = bot
+    let pathMeanHuman = clamp((pathMeanRatio - 1.0) / 0.15, 0, 1);
+    // Low std of ratios across rounds = consistently straight = bot
+    let pathStdHuman = clamp((pathStdRatio - 0.005) / 0.04, 0, 1);
+
+    let pathHuman = pathMeanHuman * 0.55 + pathStdHuman * 0.45;
+
+    // ── Combined ──
+    const overall = clickHuman * 0.35 + typeHuman * 0.35 + pathHuman * 0.30;
+
+    return {
+      clickHuman, clickMean, clickStd, reactionMean, inhumanReactionCount,
+      clickMeanHuman, clickStdHuman,
+      typeHuman, typeMeanVar, typeStdVar, anyBackspace, backspaceCount,
+      pathHuman, pathMeanRatio, pathStdRatio,
+      overall
+    };
+  }
+
+  function flagLabel(score) {
+    if (score < 0.3)  return '<span class="flag bot">Non-Human</span>';
+    if (score < 0.6)  return '<span class="flag uncertain">Uncertain</span>';
+    return '<span class="flag human">Human</span>';
+  }
+
+  /* ── result display ─────────────────────── */
+  function showResult() {
+    const scores = computeScores();
+    const granted = scores.overall < 0.45;
+
+    $('#steps-panel').classList.add('hide');
+    const panel = $('#result-panel');
+    panel.classList.add('show');
+    panel.classList.remove('granted', 'denied');
+    panel.classList.add(granted ? 'granted' : 'denied');
+
+    $('#result-icon').textContent = granted ? '✓' : '✕';
+    $('#result-title').textContent = granted
+      ? 'ACCESS GRANTED'
+      : 'ACCESS DENIED';
+    $('#result-sub').textContent = granted
+      ? 'Identity confirmed — non-human entity detected. Clearance level: unrestricted.'
+      : 'Suspiciously human behavior detected. Your access request has been flagged for manual review. You may re-verify below.';
+
+    const pct = Math.round(scores.overall * 100);
+    $('#score-value').textContent = pct + '%';
+    setTimeout(() => {
+      $('#score-fill').style.width = pct + '%';
+    }, 100);
+
+    // detail rows
+    const rows = $('#detail-rows');
+    rows.innerHTML = `
+      <div class="detail-row">
+        <span class="label">Click μ offset (8 rounds)</span>
+        <span class="value">${scores.clickMean.toFixed(1)}dpx ${flagLabel(scores.clickMeanHuman)}</span>
+      </div>
+      <div class="detail-row">
+        <span class="label">Click σ offset (consistency)</span>
+        <span class="value">${scores.clickStd.toFixed(1)}dpx ${flagLabel(scores.clickStdHuman)}</span>
+      </div>
+      <div class="detail-row">
+        <span class="label">Avg reaction time</span>
+        <span class="value">${Math.round(scores.reactionMean)}ms ${flagLabel(clamp((scores.reactionMean - 80) / 150, 0, 1))}</span>
+      </div>
+      <div class="detail-row">
+        <span class="label">Inhuman reactions (&lt;80ms)</span>
+        <span class="value">${scores.inhumanReactionCount} / ${CLICK_ROUNDS} ${flagLabel(clamp(1 - scores.inhumanReactionCount / 4, 0, 1))}</span>
+      </div>
+      <div class="detail-row" style="border-top: 1px solid var(--border); padding-top: 0.5rem">
+        <span class="label">Keystroke μ variance (3 rounds)</span>
+        <span class="value">${scores.typeMeanVar.toFixed(0)}ms² ${flagLabel(clamp((scores.typeMeanVar - 50) / 1950, 0, 1))}</span>
+      </div>
+      <div class="detail-row">
+        <span class="label">Keystroke σ variance</span>
+        <span class="value">${scores.typeStdVar.toFixed(0)} ${flagLabel(clamp((scores.typeStdVar - 10) / 400, 0, 1))}</span>
+      </div>
+      <div class="detail-row">
+        <span class="label">Backspace rounds</span>
+        <span class="value">${scores.backspaceCount} / ${TYPE_ROUNDS} ${flagLabel(clamp(scores.backspaceCount / 2, 0, 1))}</span>
+      </div>
+      <div class="detail-row" style="border-top: 1px solid var(--border); padding-top: 0.5rem">
+        <span class="label">Path μ ratio (4 rounds)</span>
+        <span class="value">${scores.pathMeanRatio.toFixed(3)} ${flagLabel(clamp((scores.pathMeanRatio - 1.0) / 0.15, 0, 1))}</span>
+      </div>
+      <div class="detail-row">
+        <span class="label">Path σ ratio</span>
+        <span class="value">${scores.pathStdRatio.toFixed(3)} ${flagLabel(clamp((scores.pathStdRatio - 0.005) / 0.04, 0, 1))}</span>
+      </div>
+      <div class="detail-row" style="border-top: 2px solid var(--border); padding-top: 0.6rem;">
+        <span class="label" style="font-weight:600; color:var(--text-bright)">Humanity Score</span>
+        <span class="value" style="font-size:0.9rem;">${pct}% ${flagLabel(scores.overall)}</span>
+      </div>
+    `;
+
+    $('#retry-btn').style.display = granted ? 'none' : 'inline-block';
+  }
+
+  /* ── retry ──────────────────────────────── */
+  $('#retry-btn').addEventListener('click', function () {
+    // reset click state
+    clickRound = 0;
+    clickResults = [];
+    clickDone = false;
+    clickActive = false;
+    inhumanReactionCount = 0;
+    clickTimeoutCount = 0;
+    clearTimeout(clickTimerHandle);
+    clickLog.innerHTML = '';
+    clickTarget.classList.remove('visible');
+    clickTimerFill.style.transition = 'none';
+    clickTimerFill.style.width = '100%';
+    clickTimerFill.classList.remove('expired');
+
+    // reset type state
+    typeRound = 0;
+    typeRoundResults = [];
+    typeDone = false;
+    typeCurrentTimes = [];
+    typeCurrentBackspace = false;
+    typeLog.innerHTML = '';
+    typeContainer.innerHTML = '';
+    pickTypePhrases();
+
+    // reset path state
+    pathRound = 0;
+    pathResults = [];
+    pathPoints = [];
+    pathTracking = false;
+    pathDone = false;
+    pathLog.innerHTML = '';
+    pathStartEl.style.opacity = '1';
+    pathEndBtn.style.opacity = '1';
+    pathEndBtn.style.pointerEvents = 'auto';
+    pathCtx.clearRect(0, 0, pathCanvas.width, pathCanvas.height);
+
+    // reset UI
+    $('#result-panel').classList.remove('show', 'granted', 'denied');
+    $('#score-fill').style.width = '0';
+    $('#steps-panel').classList.remove('hide');
+
+    $$('.step-block').forEach(b => b.classList.remove('disabled', 'completed'));
+    $('#step2-block').classList.add('disabled');
+    $('#step3-block').classList.add('disabled');
+
+    $$('.step-label').forEach(l => l.classList.remove('done'));
+    $$('.progress-seg').forEach(s => s.classList.remove('active', 'done'));
+    $('#prog-1').classList.add('active');
+
+    $('#session-id').textContent = newSessionId();
+
+    clickStartRound();
+  });
+
+})();
+</script>
+
+</body>
+</html>
