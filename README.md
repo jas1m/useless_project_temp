@@ -41,14 +41,17 @@ github pages
 For Software:
 
 # Screenshots (Add at least 3)
-![Screenshot1](Add screenshot 1 here with proper name)
+![Screenshot1]<img width="1920" height="1080" alt="Screenshot 2026-09-13 173429" src="https://github.com/user-attachments/assets/af5abd0e-6e3f-409c-9a3b-c87909960a2d" />
+(screenshot 1)
 
 *Add caption explaining what this shows*
 
-![Screenshot2](Add screenshot 2 here with proper name)
-*Add caption explaining what this shows*
+![Screenshot2](Add screenshot 2 here with proper name)<img width="1920" height="1080" alt="Screenshot 2026-09-13 172110" src="https://github.com/user-attachments/assets/76eea7ae-0bdd-41bb-bbd7-ef557d5c04ad" />
 
-![Screenshot3](Add screenshot 3 here with proper name)
+*Screenshot2*
+
+![Screenshot3]<img width="1920" height="1080" alt="Screenshot 2026-09-13 172100" src="https://github.com/user-attachments/assets/205a4119-9e6a-474a-989d-98ecbc5c2fe1" />
+(Screenshot)
 *Add caption explaining what this shows*
 
 # Diagrams
